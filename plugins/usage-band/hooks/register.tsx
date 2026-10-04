@@ -105,7 +105,7 @@ function pillSvg(key: string, label: string, pct: number, detail: string, hasBar
     const on = (Math.max(0, Math.min(pct, 100)) / 100) * PILL_BAR
     const tick = Math.min(Math.max(on, 1), PILL_BAR - 1)
     out += `<rect x="${x}" y="${PILL_H / 2 - 4}" width="${PILL_BAR}" height="8" rx="4" fill="#8b949e" fill-opacity="0.35"/>`
-    if (on > 0) out += `<rect x="${x}" y="${PILL_H / 2 - 4}" width="${Math.max(on, 8).toFixed(2)}" height="8" rx="4" fill="${color}" fill-opacity="0.85"/>`
+    if (on > 0) out += `<rect x="${x}" y="${PILL_H / 2 - 4}" width="${on.toFixed(2)}" height="8" rx="${Math.min(4, on / 2).toFixed(2)}" fill="${color}" fill-opacity="0.85"/>`
     out += `<rect x="${(x + tick - 1).toFixed(2)}" y="${PILL_H / 2 - 6}" width="2" height="12" rx="1" fill="#6e7681"/>`
     x += PILL_BAR + 6
   }
