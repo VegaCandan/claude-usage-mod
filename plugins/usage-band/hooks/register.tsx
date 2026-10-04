@@ -46,6 +46,96 @@ function ringSvg(pct: number) {
   )
 }
 
+// A horizontal progress bar for the desktop, drawn as a plain image like the ring.
+const BAR_PX = 48
+function barSvg(pct: number) {
+  const w = BAR_PX, h = 14
+  const on = (Math.max(0, Math.min(pct, 100)) / 100) * w
+  const fill = RING_HEX[colorFor(pct)]
+  // A thick rounded track with the fill on it and a dark tick marking the position.
+  const tick = Math.min(Math.max(on, 1), w - 1)
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<rect x="0" y="3" width="${w}" height="8" rx="4" fill="#8b949e" fill-opacity="0.3"/>` +
+    (on > 0 ? `<rect x="0" y="3" width="${Math.max(on, 8).toFixed(2)}" height="8" rx="4" fill="${fill}" fill-opacity="0.85"/>` : '') +
+    `<rect x="${(tick - 1).toFixed(2)}" y="1" width="2" height="12" rx="1" fill="#1f2328"/>` +
+    `</svg>`
+  )
+}
+
+// The desktop band draws each figure as one rounded pill: a tinted background,
+// an icon, the label, a bar with a position tick, the percentage and a short
+// detail (time left, tokens), all in a single image so the corners stay round.
+const CHAR_PX = 7.2
+const PILL_H = 26
+const PILL_BAR = 44
+const PILL_ICONS: Record<string, (c: string) => string> = {
+  five_hour: c => `<path d="M2.5 11a5.5 5.5 0 1 1 9 0" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/><path d="M7 9 9.6 5.4" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/>`,
+  seven_day: c => `<rect x="2" y="3" width="10" height="9" rx="2" fill="none" stroke="${c}" stroke-width="1.5"/><path d="M2 6.5h10M5 1.5v3M9 1.5v3" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`,
+  context: c => `<path d="M7 2 12.5 5 7 8 1.5 5ZM1.5 8 7 11 12.5 8" fill="none" stroke="${c}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`,
+}
+function esc(t: string) {
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+// Each pill has its own colour; a limit that is filling up still turns yellow, then red.
+const ACCENT: Record<string, string> = { five_hour: '#f778ba', seven_day: '#a371f7', context: '#58a6ff', spend_limit: '#e3b341' }
+function pillColor(key: string, pct: number) {
+  return pct >= 70 ? RING_HEX[colorFor(pct)] : ACCENT[key] ?? RING_HEX.green
+}
+function pillMetrics(label: string, pct: number, detail: string, hasBar: boolean) {
+  const pctText = `${Math.round(pct)}%`
+  const w =
+    10 + 14 + 6 + label.length * CHAR_PX + 6 + (hasBar ? PILL_BAR + 6 : 0) + pctText.length * CHAR_PX +
+    (detail ? 8 + 1 + 8 + detail.length * CHAR_PX : 0) + 10
+  return { w: Math.ceil(w), pctText }
+}
+function pillSvg(key: string, label: string, pct: number, detail: string, hasBar: boolean) {
+  const { w, pctText } = pillMetrics(label, pct, detail, hasBar)
+  const color = pillColor(key, pct)
+  const mono = `font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12"`
+  const ty = PILL_H / 2 + 4
+  let x = 10
+  let out = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${PILL_H}" viewBox="0 0 ${w} ${PILL_H}">`
+  out += `<rect width="${w}" height="${PILL_H}" rx="${PILL_H / 2}" fill="${color}" fill-opacity="0.16"/>`
+  out += `<g transform="translate(${x} ${(PILL_H - 14) / 2})">${(PILL_ICONS[key] ?? PILL_ICONS.context)(color)}</g>`
+  x += 14 + 6
+  out += `<text x="${x}" y="${ty}" ${mono} fill="#8b949e">${esc(label)}</text>`
+  x += label.length * CHAR_PX + 6
+  if (hasBar) {
+    const on = (Math.max(0, Math.min(pct, 100)) / 100) * PILL_BAR
+    const tick = Math.min(Math.max(on, 1), PILL_BAR - 1)
+    out += `<rect x="${x}" y="${PILL_H / 2 - 4}" width="${PILL_BAR}" height="8" rx="4" fill="#8b949e" fill-opacity="0.35"/>`
+    if (on > 0) out += `<rect x="${x}" y="${PILL_H / 2 - 4}" width="${Math.max(on, 8).toFixed(2)}" height="8" rx="4" fill="${color}" fill-opacity="0.85"/>`
+    out += `<rect x="${(x + tick - 1).toFixed(2)}" y="${PILL_H / 2 - 6}" width="2" height="12" rx="1" fill="#6e7681"/>`
+    x += PILL_BAR + 6
+  }
+  out += `<text x="${x}" y="${ty}" ${mono} font-weight="700" fill="${color}">${pctText}</text>`
+  x += pctText.length * CHAR_PX
+  if (detail) {
+    x += 8
+    out += `<rect x="${x}" y="6" width="1" height="${PILL_H - 12}" fill="#8b949e" fill-opacity="0.5"/>`
+    x += 9
+    out += `<text x="${x}" y="${ty}" ${mono} fill="#8b949e">${esc(detail)}</text>`
+  }
+  return { source: out + `</svg>`, width: w }
+}
+
+// Time left as "3h 57m" or "5d 6h".
+function remaining(at: number, now: number) {
+  const mins = Math.max(0, Math.round((at - now) / 60_000))
+  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60
+  if (d > 0) return `${d}d ${h}h`
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`
+  return `${m}m`
+}
+
+// The terminal gets block characters instead.
+const BAR_CELLS = 8
+function barCells(pct: number) {
+  const filled = Math.round((Math.max(0, Math.min(pct, 100)) / 100) * BAR_CELLS)
+  return { filled: '█'.repeat(filled), empty: '░'.repeat(BAR_CELLS - filled) }
+}
+
 // The terminal can't draw SVG, so it gets a pie glyph.
 function pieGlyph(pct: number) {
   if (pct < 12.5) return '○'
@@ -312,6 +402,10 @@ export const register: Register = (on, options) => {
   const showPace = isOn('pace')
   const showCompact = isOn('compact_button')
   const showReplyCost = isOn('reply_cost')
+  const showBar = isOn('bar')
+  const showPill = isOn('pill')
+  // The context figure (and the Compact button on it) is off unless asked for.
+  const showContext = (options as any)?.context === true
 
   // What the session had cost when the current reply started, and what the last
   // finished reply added.
@@ -405,12 +499,14 @@ export const register: Register = (on, options) => {
     type Segment = { key: string; label: string; pct: number; details: string[]; ahead?: boolean; tooltip: string } // tooltip: the ring's screen-reader label
     const segments: Segment[] = []
 
+    const usePills = showPill && e.surface === "desktop"
     for (const l of limits) {
       const tilde = l.isEstimate ? "~" : ""
       let details: string[] = []
       if (l.resetsAt != null) {
         // The time it resets at: just the time today, with the day when it's later.
         details = [`resets ${tilde}${clock(l.resetsAt, now)}`, `↻ ${tilde}${clock(l.resetsAt, now)}`]
+        if (usePills) details = [`${tilde}${remaining(l.resetsAt, now)}`, `${tilde}${remaining(l.resetsAt, now)}`]
       } else if (l.key === "five_hour") {
         details = ["starts on your next message", "next message"]
       }
@@ -423,13 +519,13 @@ export const register: Register = (on, options) => {
       segments.push({ key: l.key, label: l.label, pct: l.pct, details, ahead, tooltip })
     }
 
-    if (ctx?.percent != null) {
+    if (showContext && ctx?.percent != null) {
       const tokens = ctx.tokens != null ? `${compact(ctx.tokens)} / ${compact(ctx.window)}` : ""
       const tooltip = `Context window: ${ctx.percent}% full${ctx.tokens != null ? ` · ${ctx.tokens.toLocaleString()} of ${ctx.window.toLocaleString()} tokens` : ""}`
       segments.push({ key: "context", label: "Context", pct: ctx.percent, details: tokens ? [tokens] : [], tooltip })
     }
     // Offer to compact once the context is nearly full.
-    const offerCompact = showCompact && (ctx?.percent ?? 0) > 70
+    const offerCompact = showContext && showCompact && (ctx?.percent ?? 0) > 70
 
     const els = $.ui.resolve(e) as any
     const { Box, Text } = els
@@ -449,23 +545,26 @@ export const register: Register = (on, options) => {
     const replyCost = showReplyCost && lastReplyCost != null && lastReplyCost >= 0.005 ? ` (+$${lastReplyCost.toFixed(2)})` : ""
     const costText = cost != null ? `$${cost.toFixed(2)}${replyCost}` : ""
     const COMPACT_WIDTH = "Compact".length + GAP
-    type Plan = { detail: number; cost: boolean; tokens: boolean; model: boolean }
+    type Plan = { detail: number; cost: boolean; tokens: boolean; model: boolean; bar: boolean }
+    const barCols = e.surface === "desktop" ? Math.ceil(BAR_PX / 8) : BAR_CELLS
     const tailText = (p: Plan) => [p.model ? model : "", p.cost ? costText : ""].filter(Boolean).join(" · ")
     const width = (p: Plan) => {
       const segs = segments.reduce((sum, s, i) => {
         const detail = s.key === "context" ? (p.tokens ? s.details[0] ?? "" : "") : s.details[p.detail] ?? ""
-        return sum + (i ? SEP_WIDTH : 0) + 2 + s.label.length + 1 + `${Math.round(s.pct)}%`.length + (s.ahead ? 2 : 0) + (detail ? 1 + detail.length : 0)
+        if (usePills) return sum + (i ? 1 : 0) + Math.ceil(pillMetrics(s.label, s.pct, detail, p.bar).w / 10) + (s.ahead ? 2 : 0)
+        return sum + (i ? SEP_WIDTH : 0) + 2 + s.label.length + 1 + `${Math.round(s.pct)}%`.length + (p.bar ? barCols + 1 : 0) + (s.ahead ? 2 : 0) + (detail ? 1 + detail.length : 0)
       }, 0)
       const tail = tailText(p)
       return segs + (offerCompact ? COMPACT_WIDTH : 0) + (tail ? SEP_WIDTH + tail.length : 0) + 2
     }
     const cols = e.props.bodyColumns ?? 200
     const plans: Plan[] = [
-      { detail: 0, cost: true, tokens: true, model: true },
-      { detail: 1, cost: true, tokens: true, model: true },
-      { detail: 1, cost: true, tokens: false, model: true },
-      { detail: 1, cost: true, tokens: false, model: false },
-      { detail: 2, cost: true, tokens: false, model: false },
+      { detail: 0, cost: true, tokens: true, model: true, bar: showBar },
+      { detail: 1, cost: true, tokens: true, model: true, bar: showBar },
+      { detail: 1, cost: true, tokens: false, model: true, bar: showBar },
+      { detail: 1, cost: true, tokens: false, model: false, bar: showBar },
+      { detail: 1, cost: true, tokens: false, model: false, bar: false },
+      { detail: 2, cost: true, tokens: false, model: false, bar: false },
     ]
     const plan = plans.find(p => width(p) <= cols) ?? plans[plans.length - 1]
 
@@ -481,11 +580,29 @@ export const register: Register = (on, options) => {
       const ring = Svg
         ? <Svg key="ring" source={ringSvg(s.pct)} alt={s.tooltip} width={14} height={14} />
         : <Text key="ring" color={color}>{pieGlyph(s.pct)}</Text>
+      if (usePills) {
+        const pill = pillSvg(s.key, s.label, s.pct, detail ?? "", plan.bar)
+        parts.push(
+          <Box key={s.key} flexDirection="row" gap={1} flexShrink={0} alignItems="center">
+            <Svg key="pill" source={pill.source} alt={s.tooltip} width={pill.width} height={PILL_H} />
+            {s.ahead ? <Text key="ahead" color="yellow">⚠</Text> : null}
+            {s.key === "context" && offerCompact && Button
+              ? <Button key="compact" label="Compact" plain onPress={() => { $.session.compact().catch(() => {}) }} />
+              : null}
+          </Box>,
+        )
+        return
+      }
+      const cells = barCells(s.pct)
+      const bar = !plan.bar ? null : Svg
+        ? <Svg key="bar" source={barSvg(s.pct)} alt={s.tooltip} width={BAR_PX} height={14} />
+        : <Box key="bar" flexDirection="row" flexShrink={0}><Text color={color}>{cells.filled}</Text><Text dimColor>{cells.empty}</Text></Box>
       if (i) parts.push(sep(`sep-${s.key}`))
       parts.push(
         <Box key={s.key} flexDirection="row" gap={1} flexShrink={0} alignItems="center">
           {ring}
           <Text dimColor>{s.label}</Text>
+          {bar}
           <Text color={color} bold>{`${Math.round(s.pct)}%`}</Text>
           {s.ahead ? <Text key="ahead" color="yellow">⚠</Text> : null}
           {detail ? <Text dimColor>{detail}</Text> : null}
@@ -497,12 +614,12 @@ export const register: Register = (on, options) => {
     })
     const tail = tailText(plan)
     if (tail) {
-      parts.push(sep("sep-tail"))
+      if (!usePills) parts.push(sep("sep-tail"))
       parts.push(<Text key="tail" dimColor wrap="truncate-end">{tail}</Text>)
     }
 
     return (
-      <Box flexDirection="row" flexWrap="nowrap" justifyContent="center" alignItems="center" width="100%" gap={GAP} paddingX={1} overflow="hidden">
+      <Box flexDirection="row" flexWrap="nowrap" justifyContent={usePills ? "flex-start" : "center"} alignItems="center" width="100%" gap={usePills ? 1 : GAP} paddingX={1} overflow="hidden">
         {parts}
       </Box>
     )

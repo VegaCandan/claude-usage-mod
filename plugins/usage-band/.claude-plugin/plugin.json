@@ -46,6 +46,24 @@
       "title": "Last reply cost",
       "description": "Show what the last reply cost next to the session cost, e.g. $13.24 (+$0.41).",
       "default": true
+    },
+    "bar": {
+      "type": "boolean",
+      "title": "Progress bars",
+      "description": "Show a horizontal progress bar next to each percentage.",
+      "default": true
+    },
+    "pill": {
+      "type": "boolean",
+      "title": "Pill style (desktop)",
+      "description": "Draw each figure as a rounded, tinted pill with an icon, bar and time left. Desktop only.",
+      "default": true
+    },
+    "context": {
+      "type": "boolean",
+      "title": "Context window",
+      "description": "Show how full the context window is (and the Compact button).",
+      "default": false
     }
   }
 }

@@ -6,7 +6,7 @@ const BAND = {
   props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 200 } as any,
 } as const
 
-test('engine limits show exact reset times, context, model and cost on one line', async ($, on) => {
+test('engine limits show exact reset times, context, model and cost on one line', { options: { context: true, pill: false } }, async ($, on) => {
   const in2h = new Date(Date.now() + 2 * 3_600_000 + 60_000).toISOString()
   on('session.usage', () => ({
     value: {
@@ -39,7 +39,7 @@ test('engine limits show exact reset times, context, model and cost on one line'
   }
 })
 
-test('falls back to the app usage file and estimates reset times', async ($, on) => {
+test('falls back to the app usage file and estimates reset times', { options: { context: true, pill: false } }, async ($, on) => {
   const now = Date.now()
   on('session.usage', () => ({
     value: { startedAt: 0, context: { tokens: 141000, window: 1000000, percent: 14 }, rateLimits: [] },
@@ -69,7 +69,7 @@ test('falls back to the app usage file and estimates reset times', async ($, on)
   await ui.unmount()
 })
 
-test('an expired 5-hour window reads 0% and waits for the next message', async ($, on) => {
+test('an expired 5-hour window reads 0% and waits for the next message', { options: { context: true, pill: false } }, async ($, on) => {
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: [] } }))
   on('session.model', () => ({ value: 'claude-opus-5-5' }))
   on('env.get', () => ({ value: 'C:\\AppData' }))
@@ -84,7 +84,7 @@ test('an expired 5-hour window reads 0% and waits for the next message', async (
   await ui.unmount()
 })
 
-test('desktop draws SVG rings, the terminal draws pie glyphs', async ($, on) => {
+test('desktop draws SVG rings, the terminal draws pie glyphs', { options: { context: true, pill: false } }, async ($, on) => {
   on('session.usage', () => ({
     value: {
       startedAt: 0,
@@ -105,7 +105,7 @@ test('desktop draws SVG rings, the terminal draws pie glyphs', async ($, on) => 
   await term.unmount()
 })
 
-test('finds the app usage file on macOS', async ($, on) => {
+test('finds the app usage file on macOS', { options: { context: true, pill: false } }, async ($, on) => {
   // Paths come back in the host's own form, so compare them with forward slashes.
   const isMac = (p: string) => p.split('\\').join('/').endsWith('/Users/k/Library/Application Support/Claude/plan-usage-history.json')
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: [] } }))
@@ -124,7 +124,7 @@ test('finds the app usage file on macOS', async ($, on) => {
 
 const APP_FILE = (samples: unknown[]) => ({ value: JSON.stringify({ version: 2, samples }) })
 
-test('the weekly_reset option gives an exact weekly reset time', { options: { weekly_reset: 'Sat 14:30' } }, async ($, on) => {
+test('the weekly_reset option gives an exact weekly reset time', { options: { context: true, pill: false, weekly_reset: 'Sat 14:30' } }, async ($, on) => {
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: [] } }))
   on('session.model', () => ({ value: 'claude-opus-5-5' }))
   on('env.get', () => ({ value: 'C:\AppData' }))
@@ -139,7 +139,7 @@ test('the weekly_reset option gives an exact weekly reset time', { options: { we
   await ui.unmount()
 })
 
-test('without the option, the weekly reset is detected from the last drop', async ($, on) => {
+test('without the option, the weekly reset is detected from the last drop', { options: { context: true, pill: false } }, async ($, on) => {
   const now = Date.now()
   const dropAt = now - 2 * 86_400_000 // reset two days ago, so the next is in ~5 days
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: [] } }))
@@ -160,7 +160,7 @@ test('without the option, the weekly reset is detected from the last drop', asyn
   await ui.unmount()
 })
 
-test('a narrow band keeps the cost and drops the token count instead of wrapping', async ($, on) => {
+test('a narrow band keeps the cost and drops the token count instead of wrapping', { options: { context: true, pill: false } }, async ($, on) => {
   on('session.usage', () => ({
     value: {
       startedAt: 0,
@@ -190,7 +190,7 @@ const APP_ONLY = (on: any, samples: unknown[]) => {
   on('ui.render', () => null as any)
 }
 
-test('a drop seen only after a long gap gives no weekly time rather than a wrong one', async ($, on) => {
+test('a drop seen only after a long gap gives no weekly time rather than a wrong one', { options: { context: true, pill: false } }, async ($, on) => {
   const now = Date.now()
   APP_ONLY(on, [
     { t: now - 4 * 86_400_000, org: 'a', u: { fh: 0, sd: 60 } },
@@ -205,7 +205,7 @@ test('a drop seen only after a long gap gives no weekly time rather than a wrong
   await ui.unmount()
 })
 
-test('several weekly resets are overlapped to pin the time down', async ($, on) => {
+test('several weekly resets are overlapped to pin the time down', { options: { context: true, pill: false } }, async ($, on) => {
   const WEEK = 7 * 86_400_000
   const reset = Date.now() - 2 * 86_400_000 // the true reset, two days ago
   APP_ONLY(on, [
@@ -228,7 +228,7 @@ test('several weekly resets are overlapped to pin the time down', async ($, on) 
   await ui.unmount()
 })
 
-test("another account's readings in the file are ignored", async ($, on) => {
+test("another account's readings in the file are ignored", { options: { context: true, pill: false } }, async ($, on) => {
   const now = Date.now()
   APP_ONLY(on, [
     { t: now - 3 * 3_600_000, org: 'other', u: { fh: 0, sd: 90 } },
@@ -250,7 +250,7 @@ const STORE = (on: any) => {
   return store
 }
 
-test('exact figures from one session are reused in a session that has none', async ($, on) => {
+test('exact figures from one session are reused in a session that has none', { options: { context: true, pill: false } }, async ($, on) => {
   const now = Date.now()
   const fiveHourReset = now + 3 * 3_600_000
   const weekReset = now + 2 * 86_400_000
@@ -288,7 +288,7 @@ test('exact figures from one session are reused in a session that has none', asy
   await ui.unmount()
 })
 
-test('a saved weekly reset that has passed rolls on a week, and the old week reads 0%', async ($, on) => {
+test('a saved weekly reset that has passed rolls on a week, and the old week reads 0%', { options: { context: true, pill: false } }, async ($, on) => {
   const now = Date.now()
   const store = STORE(on)
   const passedReset = now - 86_400_000 // reset a day ago
@@ -318,7 +318,7 @@ const ENGINE = (on: any, value: object) => {
 }
 const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString()
 
-test('a limit used faster than its window passes is marked with ⚠', async ($, on) => {
+test('a limit used faster than its window passes is marked with ⚠', { options: { context: true, pill: false } }, async ($, on) => {
   STORE(on)
   ENGINE(on, {
     rateLimits: [
@@ -331,7 +331,7 @@ test('a limit used faster than its window passes is marked with ⚠', async ($, 
   await ui.unmount()
 })
 
-test('alerts pop up once at 80%, and again when the limit resets', async ($, on) => {
+test('alerts pop up once at 80%, and again when the limit resets', { options: { context: true, pill: false } }, async ($, on) => {
   const memory = STORE(on)
   const toasts: string[] = []
   on('ui.toast', (_$: any, e: any) => (toasts.push(e.text), { value: undefined }) as any)
@@ -355,7 +355,7 @@ test('alerts pop up once at 80%, and again when the limit resets', async ($, on)
   expect(toasts).toContain('5-hour limit has reset')
 })
 
-test('alerts can be turned off', { options: { alerts: false } }, async ($, on) => {
+test('alerts can be turned off', { options: { context: true, pill: false, alerts: false } }, async ($, on) => {
   STORE(on)
   const toasts: string[] = []
   on('ui.toast', (_$: any, e: any) => (toasts.push(e.text), { value: undefined }) as any)
@@ -364,7 +364,7 @@ test('alerts can be turned off', { options: { alerts: false } }, async ($, on) =
   expect(toasts).toEqual([])
 })
 
-test('a context over 70% full offers a Compact button that compacts', async ($, on) => {
+test('a context over 70% full offers a Compact button that compacts', { options: { context: true, pill: false } }, async ($, on) => {
   STORE(on)
   let compacted = 0
   let percent = 72
@@ -386,7 +386,7 @@ test('a context over 70% full offers a Compact button that compacts', async ($, 
   await ui.unmount()
 })
 
-test('desktop rings are plain images, so redraws do not make them flicker', async ($, on) => {
+test('desktop rings are plain images, so redraws do not make them flicker', { options: { context: true, pill: false } }, async ($, on) => {
   STORE(on)
   ENGINE(on, { rateLimits: [{ kind: 'seven_day', percentUsed: 52, resetsAt: inHours(30) }] })
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
@@ -394,5 +394,40 @@ test('desktop rings are plain images, so redraws do not make them flicker', asyn
   expect(ring).toBeDefined()
   expect(ring?.props?.isInteractive ?? ring?.isInteractive).toBeFalsy()
   expect(String(ring?.props?.alt ?? ring?.alt)).toContain('Weekly limit: 52% used')
+  await ui.unmount()
+})
+
+test('desktop draws each figure as one rounded pill with bar and time left', { options: { context: true } }, async ($, on) => {
+  on('session.usage', () => ({
+    value: {
+      startedAt: 0,
+      context: { tokens: 82000, window: 200000, percent: 41 },
+      rateLimits: [{ kind: 'five_hour', percentUsed: 58, resetsAt: new Date(Date.now() + 2 * 3_600_000 + 60_000).toISOString() }],
+      cost: { usd: 2.14 },
+    },
+  }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('ui.render', () => null as any)
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const pills: any[] = await ui.findAll({ type: 'Svg' } as any)
+  expect(pills.length).toBe(2)
+  const five = pills[0].props.source as string
+  expect(five).toContain('rx="13"')
+  expect(five).toContain('58%')
+  expect(five).toMatch(/2h \d\dm/)
+  expect(pills[1].props.source).toContain('41%')
+  await ui.unmount()
+})
+
+test('the context figure is hidden unless the option is on', async ($, on) => {
+  on('session.usage', () => ({
+    value: { startedAt: 0, context: { tokens: 82000, window: 200000, percent: 41 }, rateLimits: [{ kind: 'five_hour', percentUsed: 58, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }], cost: { usd: 2.14 } },
+  }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('ui.render', () => null as any)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /^Context$/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^5h$/ })).toBeDefined()
   await ui.unmount()
 })
